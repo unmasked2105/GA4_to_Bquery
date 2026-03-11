@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GA4 → BigQuery · Setup & Schema</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Martian+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #f8f6f1;
+  --surface:  #ffffff;
+  --ink:      #1a1814;
+  --muted:    #6b6760;
+  --rule:     #e2ddd6;
+  --ga4:      #e37400;
+  --ga4-soft: #fef3e2;
+  --bq:       #1a73e8;
+  --bq-soft:  #e8f0fe;
+  --green:    #188038;
+  --green-soft:#e6f4ea;
+  --red:      #c5221f;
+  --red-soft: #fce8e6;
+  --yellow:   #f29900;
+  --yellow-soft:#fef7e0;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Martian Mono', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ─── MASTHEAD ─── */
+.masthead {
+  background: var(--ink);
+  color: var(--bg);
+  padding: 0;
+}
+
+.masthead-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 2rem;
+  border-bottom: 1px solid #333;
+  font-size: 0.55rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: #888;
+}
+
+.masthead-body {
+  padding: 2.5rem 2rem 2rem;
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+.masthead-eyebrow {
+  font-size: 0.55rem;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: var(--ga4);
+  margin-bottom: 0.75rem;
+}
+
+.masthead-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: clamp(2.2rem, 5vw, 4rem);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  color: #f8f6f1;
+}
+
+.masthead-title .ga4-hl { color: var(--ga4); }
+.masthead-title .bq-hl  { color: #7baaf7; }
+
+.masthead-meta {
+  display: flex;
+  gap: 2rem;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #333;
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  color: #888;
+}
+
+.meta-item strong { color: #ccc; display: block; margin-bottom: 0.2rem; }
+
+/* ─── LAYOUT ─── */
+.body-wrap {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 2rem 4rem;
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 2.5rem;
+  align-items: start;
+}
+
+.main-col { padding-top: 2rem; }
+.side-col { padding-top: 2rem; position: sticky; top: 1rem; }
+
+/* ─── SECTION ─── */
+.section { margin-bottom: 3rem; }
+
+.section-label {
+  font-size: 0.52rem;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
+}
+
+.section-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: clamp(1.4rem, 2.5vw, 2rem);
+  line-height: 1.15;
+  margin-bottom: 0.75rem;
+  letter-spacing: -0.01em;
+}
+
+.section-desc {
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.75;
+  margin-bottom: 1.5rem;
+  max-width: 600px;
+}
+
+/* ─── CHECKLIST STEPS ─── */
+.checklist { display: flex; flex-direction: column; gap: 1px; }
+
+.cl-item {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  transition: border-color 0.2s;
+}
+
+.cl-item:hover { border-color: #bbb; }
+.cl-item.done  { border-left: 3px solid var(--green); }
+.cl-item.warn  { border-left: 3px solid var(--yellow); }
+.cl-item.info  { border-left: 3px solid var(--bq); }
+
+.cl-num {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 1.25rem 0.5rem 0;
+  border-right: 1px solid var(--rule);
+}
+
+.cl-circle {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ga4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--ga4);
+}
+
+.cl-body { padding: 1.25rem 1.25rem 1.25rem 1.25rem; }
+
+.cl-title {
+  font-weight: 600;
+  font-size: 0.8rem;
+  margin-bottom: 0.35rem;
+  color: var(--ink);
+}
+
+.cl-desc {
+  font-size: 0.65rem;
+  color: var(--muted);
+  line-height: 1.7;
+  margin-bottom: 0.6rem;
+}
+
+.cl-path {
+  font-size: 0.6rem;
+  background: var(--ink);
+  color: var(--bg);
+  padding: 0.35rem 0.75rem;
+  display: inline-block;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.6rem;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.55rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 2px;
+  letter-spacing: 0.05em;
+  margin-right: 0.4rem;
+  margin-top: 0.2rem;
+}
+
+.pill.ok   { background: var(--green-soft);  color: var(--green); }
+.pill.warn { background: var(--yellow-soft); color: var(--yellow); }
+.pill.info { background: var(--bq-soft);     color: var(--bq); }
+.pill.err  { background: var(--red-soft);    color: var(--red); }
+
+/* ─── TABLE TYPE CARDS ─── */
+.table-types {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--rule);
+  margin: 1.5rem 0;
+}
+
+.tt-card {
+  background: var(--surface);
+  padding: 1.25rem;
+}
+
+.tt-name {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--bq);
+  margin-bottom: 0.2rem;
+  letter-spacing: 0.02em;
+}
+
+.tt-format {
+  font-size: 0.55rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.tt-body {
+  font-size: 0.65rem;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.tt-body strong { color: var(--ink); }
+
+/* ─── SCHEMA EXPLORER ─── */
+.schema-explorer {
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.se-header {
+  background: var(--ink);
+  color: var(--bg);
+  padding: 0.6rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.se-title { font-size: 0.6rem; letter-spacing: 0.15em; text-transform: uppercase; }
+.se-badge {
+  font-size: 0.5rem;
+  padding: 0.15rem 0.5rem;
+  background: var(--ga4);
+  color: white;
+  letter-spacing: 0.1em;
+}
+
+.se-cols {
+  display: grid;
+  grid-template-columns: 200px 100px 1fr 80px;
+  background: var(--bg);
+  border-bottom: 2px solid var(--ink);
+}
+
+.se-col-head {
+  padding: 0.5rem 0.85rem;
+  font-size: 0.5rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--muted);
+  border-right: 1px solid var(--rule);
+}
+
+.se-row {
+  display: grid;
+  grid-template-columns: 200px 100px 1fr 80px;
+  border-bottom: 1px solid var(--rule);
+  transition: background 0.15s;
+  cursor: default;
+}
+
+.se-row:hover { background: #faf8f4; }
+
+.se-row.group-header {
+  background: var(--ga4-soft);
+  border-bottom: 1px solid #f0c070;
+}
+
+.se-row.group-header .se-cell { color: var(--ga4); font-weight: 600; }
+
+.se-row.nested .se-cell:first-child {
+  padding-left: 2rem;
+  color: var(--bq);
+}
+
+.se-row.nested { background: var(--bq-soft); }
+.se-row.nested:hover { background: #dce8fd; }
+
+.se-cell {
+  padding: 0.6rem 0.85rem;
+  font-size: 0.63rem;
+  border-right: 1px solid var(--rule);
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.se-cell:last-child { border-right: none; }
+
+.type-badge {
+  font-size: 0.48rem;
+  padding: 0.15rem 0.4rem;
+  background: var(--bq-soft);
+  color: var(--bq);
+  letter-spacing: 0.05em;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+
+.type-badge.arr { background: #fff3e0; color: #e65100; }
+.type-badge.str { background: var(--green-soft); color: var(--green); }
+.type-badge.int { background: #f3e5f5; color: #6a1b9a; }
+.type-badge.flt { background: #fce4ec; color: #880e4f; }
+.type-badge.ts  { background: var(--bq-soft); color: var(--bq); }
+
+.imp-badge {
+  font-size: 0.45rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 2px;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.imp-badge.key    { background: var(--ga4-soft); color: var(--ga4); }
+.imp-badge.nested { background: var(--bq-soft);  color: var(--bq); }
+.imp-badge.ecomm  { background: var(--green-soft); color: var(--green); }
+
+/* ─── UNNEST EXPLAINER ─── */
+.unnest-box {
+  background: var(--ink);
+  color: var(--bg);
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.unnest-box::before {
+  content: 'CRITICAL CONCEPT';
+  position: absolute;
+  top: 0.75rem; right: 1rem;
+  font-size: 0.45rem;
+  letter-spacing: 0.3em;
+  color: var(--ga4);
+}
+
+.unnest-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.2rem;
+  color: var(--ga4);
+  margin-bottom: 0.75rem;
+}
+
+.unnest-body {
+  font-size: 0.67rem;
+  color: #ccc;
+  line-height: 1.75;
+  margin-bottom: 1rem;
+}
+
+.unnest-body strong { color: white; }
+
+.unnest-visual {
+  display: grid;
+  grid-template-columns: 1fr 30px 1fr;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 1rem;
+  font-size: 0.6rem;
+}
+
+.uv-before, .uv-after {
+  background: #0f0d0a;
+  border: 1px solid #333;
+  padding: 0.75rem;
+}
+
+.uv-label {
+  font-size: 0.48rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.5rem;
+}
+
+.uv-code { color: #7baaf7; line-height: 1.7; }
+.uv-code .ga4c { color: var(--ga4); }
+.uv-code .gc   { color: #7eca9c; }
+
+.uv-arrow {
+  text-align: center;
+  color: var(--ga4);
+  font-size: 1.2rem;
+}
+
+/* ─── SIDEBAR ─── */
+.sidebar-card {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.sidebar-card-title {
+  font-size: 0.55rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.checklist-mini {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.cm-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  font-size: 0.62rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.cm-box {
+  width: 14px; height: 14px;
+  border: 1.5px solid var(--rule);
+  flex-shrink: 0;
+  margin-top: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.5rem;
+}
+
+.cm-box.done { border-color: var(--green); color: var(--green); background: var(--green-soft); }
+.cm-box.active { border-color: var(--ga4); }
+
+.pipeline-mini {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.pm-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 0.6rem;
+}
+
+.pm-row:last-child { border-bottom: none; }
+
+.pm-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pm-label { color: var(--ink); font-weight: 500; }
+.pm-sub   { font-size: 0.52rem; color: var(--muted); margin-left: auto; }
+
+.key-terms { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.kt-item {}
+.kt-term { font-size: 0.6rem; font-weight: 600; color: var(--ink); margin-bottom: 0.2rem; }
+.kt-def  { font-size: 0.58rem; color: var(--muted); line-height: 1.55; }
+
+/* ─── CODE ─── */
+.code-block {
+  background: var(--ink);
+  margin: 1rem 0;
+  overflow: hidden;
+}
+
+.cb-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid #333;
+  font-size: 0.52rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #888;
+}
+
+.cb-lang { color: var(--ga4); }
+
+pre {
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  font-family: 'Martian Mono', monospace;
+  font-size: 0.65rem;
+  line-height: 1.85;
+  background: transparent;
+  color: #e0dbd0;
+}
+
+.ck { color: #cc99cd; }
+.cs { color: #7ec699; }
+.cf { color: #e37400; }
+.cv { color: #7baaf7; }
+.cc { color: #555555; font-style: italic; }
+.cn { color: #f08d49; }
+
+/* ─── RESPONSIVE ─── */
+@media (max-width: 800px) {
+  .body-wrap { grid-template-columns: 1fr; }
+  .side-col { position: static; }
+  .se-cols, .se-row { grid-template-columns: 160px 90px 1fr; }
+  .se-cols > *:last-child, .se-row > *:last-child { display: none; }
+  .table-types { grid-template-columns: 1fr; }
+  .unnest-visual { grid-template-columns: 1fr; }
+  .uv-arrow { transform: rotate(90deg); }
+}
+</style>
+</head>
+<body>
+
+<!-- MASTHEAD -->
+<div class="masthead">
+  <div class="masthead-top">
+    <span>Data Engineering · Internship Reference</span>
+    <span>GA4 → BQ · Setup & Schema</span>
+  </div>
+  <div class="masthead-body">
+    <div class="masthead-eyebrow">▸ Internship Pipeline · GCP Stack</div>
+    <h1 class="masthead-title">
+      <span class="ga4-hl">Google Analytics 4</span><br>
+      to <span class="bq-hl">BigQuery</span><br>
+      Setup & Schema
+    </h1>
+    <div class="masthead-meta">
+      <div class="meta-item"><strong>Goal</strong>Build pipeline at internship</div>
+      <div class="meta-item"><strong>Stack</strong>GA4 · BigQuery · GCS · Databricks</div>
+      <div class="meta-item"><strong>Covers</strong>Config · Tables · Schema · UNNEST</div>
+      <div class="meta-item"><strong>Prereq</strong>BQ access + GA4 property</div>
+    </div>
+  </div>
+</div>
+
+<div class="body-wrap">
+
+  <!-- ═══ MAIN COLUMN ═══ -->
+  <div class="main-col">
+
+    <!-- SETUP -->
+    <div class="section">
+      <div class="section-label">Part 01</div>
+      <h2 class="section-title">Setting Up the Connection</h2>
+      <p class="section-desc">GA4 has a native BigQuery export — no ETL tool, no custom connector, no Fivetran needed. Google built this in for free. You configure it once, it runs forever automatically.</p>
+
+      <div class="checklist">
+
+        <div class="cl-item info">
+          <div class="cl-num"><div class="cl-circle">1</div></div>
+          <div class="cl-body">
+            <div class="cl-title">Confirm you have GA4 (not Universal Analytics)</div>
+            <div class="cl-desc">Native BQ export is GA4-only. If your company is still on Universal Analytics (UA), you'll need a different approach. Check the property — GA4 properties show a number like <strong>G-XXXXXXXXXX</strong>. UA properties show <strong>UA-XXXXX-X</strong>.</div>
+            <span class="pill info">ℹ GA4 = free BQ export</span>
+            <span class="pill err">✗ UA = not free, needs workaround</span>
+          </div>
+        </div>
+
+        <div class="cl-item info">
+          <div class="cl-num"><div class="cl-circle">2</div></div>
+          <div class="cl-body">
+            <div class="cl-title">Make sure BigQuery API is enabled in GCP</div>
+            <div class="cl-desc">In your GCP Console, go to APIs & Services → search BigQuery → confirm it's enabled. Also confirm you have a GCP project ready. Since you're already using BQ for other pipelines, this is probably already done.</div>
+            <div class="cl-path">GCP Console → APIs & Services → BigQuery API → Enable</div>
+            <span class="pill ok">✓ Likely already done at your internship</span>
+          </div>
+        </div>
+
+        <div class="cl-item done">
+          <div class="cl-num"><div class="cl-circle">3</div></div>
+          <div class="cl-body">
+            <div class="cl-title">Link GA4 Property to BigQuery</div>
+            <div class="cl-desc">This is the actual setup step. In GA4 go to Admin, then under the Property column find <strong>BigQuery Links</strong>. Click Link. Select your GCP project. Choose your BigQuery dataset location — pick the same region as your other BQ datasets (usually <strong>US</strong> or <strong>EU</strong>). Mismatched regions cause query errors later.</div>
+            <div class="cl-path">GA4 Admin → Property Column → BigQuery Links → Link</div>
+            <span class="pill ok">✓ One time setup, no code needed</span>
+            <span class="pill warn">⚠ Match region to your existing BQ datasets</span>
+          </div>
+        </div>
+
+        <div class="cl-item done">
+          <div class="cl-num"><div class="cl-circle">4</div></div>
+          <div class="cl-body">
+            <div class="cl-title">Choose Export Type: Daily vs Streaming</div>
+            <div class="cl-desc">During linking, GA4 asks which type of export you want.</div>
+            <div class="table-types" style="margin-top:0.75rem;">
+              <div class="tt-card">
+                <div class="tt-name">Daily Export</div>
+                <div class="tt-format">Table: events_YYYYMMDD</div>
+                <div class="tt-body">Runs once per day, next morning. ~24hr delay. <strong>Free.</strong> Good enough for 90% of pipeline work. <strong>Use this for your internship pipeline.</strong></div>
+              </div>
+              <div class="tt-card">
+                <div class="tt-name">Streaming Export</div>
+                <div class="tt-format">Table: events_intraday_YYYYMMDD</div>
+                <div class="tt-body">Events land within ~1 min. <strong>Has BQ streaming costs.</strong> Updated continuously until replaced by daily table next morning. Has occasional duplicates.</div>
+              </div>
+            </div>
+            <span class="pill ok">✓ For a pipeline — choose Daily. Free + reliable.</span>
+          </div>
+        </div>
+
+        <div class="cl-item done">
+          <div class="cl-num"><div class="cl-circle">5</div></div>
+          <div class="cl-body">
+            <div class="cl-title">Verify Data is Landing in BigQuery</div>
+            <div class="cl-desc">After 24–48 hours, open BigQuery console. Look for a new dataset named after your GA4 property ID — format is <strong>analytics_XXXXXXXXX</strong>. Inside that dataset you should see daily tables appearing. If you see them — you're connected and data is flowing.</div>
+            <div class="cl-path">BigQuery Console → Your Project → analytics_XXXXXXXXX → events_YYYYMMDD</div>
+            <span class="pill ok">✓ If tables appear = connection is working</span>
+            <span class="pill err">✗ No tables after 48h = check IAM permissions</span>
+          </div>
+        </div>
+
+        <div class="cl-item warn">
+          <div class="cl-num"><div class="cl-circle">6</div></div>
+          <div class="cl-body">
+            <div class="cl-title">IAM Permissions — If something breaks</div>
+            <div class="cl-desc">GA4 uses a Google-managed service account to write data into your BQ project. If it doesn't have permission, data won't land. The service account is <strong>firebase-measurement@system.gserviceaccount.com</strong>. It needs <strong>BigQuery Data Editor</strong> role. Usually auto-configured during linking — only fix this if data isn't appearing after 48 hours.</div>
+            <div class="cl-path">GCP IAM → Grant: firebase-measurement@system → BigQuery Data Editor</div>
+            <span class="pill warn">⚠ Only needed if data is not appearing</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- SCHEMA -->
+    <div class="section">
+      <div class="section-label">Part 02</div>
+      <h2 class="section-title">How Data Lands — Schema</h2>
+      <p class="section-desc">This is the most important thing to understand before you write a single line of pipeline code. GA4's schema has one design decision that trips up every beginner.</p>
+
+      <!-- THE UNNEST CONCEPT -->
+      <div class="unnest-box">
+        <div class="unnest-title">The UNNEST Pattern</div>
+        <div class="unnest-body">
+          GA4 stores event parameters as an <strong>ARRAY of STRUCTs</strong> called <code>event_params</code>. Instead of separate columns for each parameter, every param is a key-value pair inside a nested array. To access any parameter (like <strong>page_url</strong>, <strong>session_id</strong>, <strong>engagement_time</strong>), you must UNNEST the array and filter by key name. This is the single most important SQL pattern in GA4 BQ work.
+        </div>
+        <div class="unnest-visual">
+          <div class="uv-before">
+            <div class="uv-label">Raw in BigQuery</div>
+            <div class="uv-code">event_params: [<br>
+&nbsp;&nbsp;{key: <span class="ga4c">"page_location"</span>,<br>
+&nbsp;&nbsp;&nbsp;value: {string_value:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="gc">"example.com/home"</span>}},<br>
+&nbsp;&nbsp;{key: <span class="ga4c">"ga_session_id"</span>,<br>
+&nbsp;&nbsp;&nbsp;value: {int_value: <span class="ga4c">1234567</span>}},<br>
+&nbsp;&nbsp;{key: <span class="ga4c">"page_title"</span>,<br>
+&nbsp;&nbsp;&nbsp;value: {string_value: <span class="gc">"Home"</span>}}<br>
+]</div>
+          </div>
+          <div class="uv-arrow">→</div>
+          <div class="uv-after">
+            <div class="uv-label">After UNNEST in SQL</div>
+            <div class="uv-code">page_location: <span class="gc">"example.com/home"</span><br>
+ga_session_id: <span class="ga4c">1234567</span><br>
+page_title: <span class="gc">"Home"</span><br>
+<br>
+<span style="color:#555;">-- Flat, usable columns</span><br>
+<span style="color:#555;">-- Ready for your pipeline</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FULL SCHEMA TABLE -->
+      <div class="schema-explorer">
+        <div class="se-header">
+          <span class="se-title">events_YYYYMMDD · Full Column Reference</span>
+          <span class="se-badge">GA4 Export Schema</span>
+        </div>
+        <div class="se-cols">
+          <div class="se-col-head">Column Name</div>
+          <div class="se-col-head">Data Type</div>
+          <div class="se-col-head">Description</div>
+          <div class="se-col-head">Priority</div>
+        </div>
+
+        <!-- EVENT FIELDS -->
+        <div class="se-row group-header">
+          <div class="se-cell">── EVENT FIELDS ──</div>
+          <div class="se-cell"></div>
+          <div class="se-cell">Core event information — always populated</div>
+          <div class="se-cell"></div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">event_date</div>
+          <div class="se-cell"><span class="type-badge str">STRING</span></div>
+          <div class="se-cell">Date as YYYYMMDD string e.g. '20240115'. Note: string not date type.</div>
+          <div class="se-cell"><span class="imp-badge key">🔑 Key</span></div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">event_timestamp</div>
+          <div class="se-cell"><span class="type-badge int">INT64</span></div>
+          <div class="se-cell">Unix time in microseconds. Use TIMESTAMP_MICROS() to convert.</div>
+          <div class="se-cell"><span class="imp-badge key">🔑 Key</span></div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">event_name</div>
+          <div class="se-cell"><span class="type-badge str">STRING</span></div>
+          <div class="se-cell">page_view, session_start, purchase, scroll, click, custom events</div>
+          <div class="se-cell"><span class="imp-badge key">🔑 Key</span></div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">event_params</div>
+          <div class="se-cell"><span class="type-badge arr">ARRAY&lt;STRUCT&gt;</span></div>
+          <div class="se-cell">All event parameters as key-value array. Requires UNNEST to access.</div>
+          <div class="se-cell"><span class="imp-badge nested">⬡ Nested</span></div>
+        </div>
+        <div class="se-row nested">
+          <div class="se-cell">└ key</div>
+          <div class="se-cell"><span class="type-badge str">STRING</span></div>
+          <div class="se-cell">Parameter name: page_location, session_id, engagement_time_msec</div>
+          <div class="se-cell"></div>
+        </div>
+        <div class="se-row nested">
+          <div class="se-cell">└ value.string_value</div>
+          <div class="se-cell"><span class="type-badge str">STRING</span></div>
+          <div class="se-cell">String parameters — URLs, titles, event categories</div>
+          <div class="se-cell"></div>
+        </div>
+        <div class="se-row nested">
+          <div class="se-cell">└ value.int_value</div>
+          <div class="se-cell"><span class="type-badge int">INT64</span></div>
+          <div class="se-cell">Integer parameters — session_id, item quantities</div>
+          <div class="se-cell"></div>
+        </div>
+        <div class="se-row nested">
+          <div class="se-cell">└ value.float_value</div>
+          <div class="se-cell"><span class="type-badge flt">FLOAT64</span></div>
+          <div class="se-cell">Float parameters — prices, currency values</div>
+          <div class="se-cell"></div>
+        </div>
+
+        <!-- USER FIELDS -->
+        <div class="se-row group-header">
+          <div class="se-cell">── USER FIELDS ──</div>
+          <div class="se-cell"></div>
+          <div class="se-cell">User identification and properties</div>
+          <div class="se-cell"></div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">user_pseudo_id</div>
+          <div class="se-cell"><span class="type-badge str">STRING</span></div>
+          <div class="se-cell">Anonymized cookie-based user ID. Not PII. Best user identifier available.</div>
+          <div class="se-cell"><span class="imp-badge key">🔑 Key</span></div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">user_id</div>
+          <div class="se-cell"><span class="type-badge str">STRING</span></div>
+          <div class="se-cell">Your own user ID — only set if app calls setUserId(). Often NULL.</div>
+          <div class="se-cell"></div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">user_properties</div>
+          <div class="se-cell"><span class="type-badge arr">ARRAY&lt;STRUCT&gt;</span></div>
+          <div class="se-cell">User-level properties. Same nested structure as event_params.</div>
+          <div class="se-cell"><span class="imp-badge nested">⬡ Nested</span></div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">user_first_touch_timestamp</div>
+          <div class="se-cell"><span class="type-badge int">INT64</span></div>
+          <div class="se-cell">When this user was first seen. Microseconds, use TIMESTAMP_MICROS().</div>
+          <div class="se-cell"></div>
+        </div>
+
+        <!-- GEO + DEVICE -->
+        <div class="se-row group-header">
+          <div class="se-cell">── GEO & DEVICE ──</div>
+          <div class="se-cell"></div>
+          <div class="se-cell">Location and device info — directly accessible, no UNNEST needed</div>
+          <div class="se-cell"></div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">geo.country</div>
+          <div class="se-cell"><span class="type-badge str">STRING</span></div>
+          <div class="se-cell">Country from IP — "India", "United States"</div>
+          <div class="se-cell"><span class="imp-badge key">🔑 Key</span></div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">geo.city</div>
+          <div class="se-cell"><span class="type-badge str">STRING</span></div>
+          <div class="se-cell">City from IP geolocation</div>
+          <div class="se-cell"></div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">geo.region</div>
+          <div class="se-cell"><span class="type-badge str">STRING</span></div>
+          <div class="se-cell">State/region from IP</div>
+          <div class="se-cell"></div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">device.category</div>
+          <div class="se-cell"><span class="type-badge str">STRING</span></div>
+          <div class="se-cell">mobile / tablet / desktop</div>
+          <div class="se-cell"><span class="imp-badge key">🔑 Key</span></div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">device.operating_system</div>
+          <div class="se-cell"><span class="type-badge str">STRING</span></div>
+          <div class="se-cell">Android, iOS, Windows, Macintosh, Linux</div>
+          <div class="se-cell"></div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">device.browser</div>
+          <div class="se-cell"><span class="type-badge str">STRING</span></div>
+          <div class="se-cell">Chrome, Safari, Firefox, Edge</div>
+          <div class="se-cell"></div>
+        </div>
+
+        <!-- TRAFFIC -->
+        <div class="se-row group-header">
+          <div class="se-cell">── TRAFFIC SOURCE ──</div>
+          <div class="se-cell"></div>
+          <div class="se-cell">Where the user came from — directly accessible</div>
+          <div class="se-cell"></div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">traffic_source.source</div>
+          <div class="se-cell"><span class="type-badge str">STRING</span></div>
+          <div class="se-cell">google, direct, facebook, instagram, newsletter</div>
+          <div class="se-cell"><span class="imp-badge key">🔑 Key</span></div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">traffic_source.medium</div>
+          <div class="se-cell"><span class="type-badge str">STRING</span></div>
+          <div class="se-cell">organic, cpc, email, referral, social</div>
+          <div class="se-cell"><span class="imp-badge key">🔑 Key</span></div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">traffic_source.name</div>
+          <div class="se-cell"><span class="type-badge str">STRING</span></div>
+          <div class="se-cell">Campaign name from UTM parameters</div>
+          <div class="se-cell"></div>
+        </div>
+
+        <!-- ECOMMERCE -->
+        <div class="se-row group-header">
+          <div class="se-cell">── E-COMMERCE ──</div>
+          <div class="se-cell"></div>
+          <div class="se-cell">Populated only for purchase/ecommerce events</div>
+          <div class="se-cell"></div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">ecommerce.purchase_revenue</div>
+          <div class="se-cell"><span class="type-badge flt">FLOAT64</span></div>
+          <div class="se-cell">Revenue amount for purchase events. NULL for non-purchase events.</div>
+          <div class="se-cell"><span class="imp-badge ecomm">💰 E-comm</span></div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">ecommerce.transaction_id</div>
+          <div class="se-cell"><span class="type-badge str">STRING</span></div>
+          <div class="se-cell">Order/transaction ID for deduplication</div>
+          <div class="se-cell"><span class="imp-badge ecomm">💰 E-comm</span></div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">items</div>
+          <div class="se-cell"><span class="type-badge arr">ARRAY&lt;STRUCT&gt;</span></div>
+          <div class="se-cell">Product items — item_id, item_name, price, quantity per item</div>
+          <div class="se-cell"><span class="imp-badge nested">⬡ Nested</span></div>
+        </div>
+
+      </div>
+
+      <!-- COMMON EVENT PARAMS -->
+      <p style="font-size:0.52rem; letter-spacing:0.3em; text-transform:uppercase; color:var(--muted); margin:1.5rem 0 0.75rem;">▸ Most Used event_params keys (access via UNNEST)</p>
+
+      <div class="schema-explorer">
+        <div class="se-header">
+          <span class="se-title">event_params Keys Reference</span>
+          <span class="se-badge">Requires UNNEST</span>
+        </div>
+        <div class="se-cols">
+          <div class="se-col-head">Key Name</div>
+          <div class="se-col-head">Value Field</div>
+          <div class="se-col-head">What it contains</div>
+          <div class="se-col-head">Events</div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">page_location</div>
+          <div class="se-cell"><span class="type-badge str">string_value</span></div>
+          <div class="se-cell">Full URL including path and query params</div>
+          <div class="se-cell">page_view</div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">page_title</div>
+          <div class="se-cell"><span class="type-badge str">string_value</span></div>
+          <div class="se-cell">HTML page title tag content</div>
+          <div class="se-cell">page_view</div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">page_referrer</div>
+          <div class="se-cell"><span class="type-badge str">string_value</span></div>
+          <div class="se-cell">Previous page URL</div>
+          <div class="se-cell">page_view</div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">ga_session_id</div>
+          <div class="se-cell"><span class="type-badge int">int_value</span></div>
+          <div class="se-cell">Session identifier — combine with user_pseudo_id for unique session</div>
+          <div class="se-cell">All</div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">ga_session_number</div>
+          <div class="se-cell"><span class="type-badge int">int_value</span></div>
+          <div class="se-cell">Which session number for this user (1st visit, 2nd, etc.)</div>
+          <div class="se-cell">session_start</div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">engagement_time_msec</div>
+          <div class="se-cell"><span class="type-badge int">int_value</span></div>
+          <div class="se-cell">Milliseconds user was engaged — sum across session for total time</div>
+          <div class="se-cell">All</div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">session_engaged</div>
+          <div class="se-cell"><span class="type-badge str">string_value</span></div>
+          <div class="se-cell">"1" if session lasted 10+ seconds or had 2+ pageviews</div>
+          <div class="se-cell">All</div>
+        </div>
+        <div class="se-row">
+          <div class="se-cell">percent_scrolled</div>
+          <div class="se-cell"><span class="type-badge int">int_value</span></div>
+          <div class="se-cell">How far user scrolled — value is 90 (fires at 90% scroll)</div>
+          <div class="se-cell">scroll</div>
+        </div>
+      </div>
+
+      <!-- QUICK SQL REFERENCE -->
+      <p style="font-size:0.52rem; letter-spacing:0.3em; text-transform:uppercase; color:var(--muted); margin:1.5rem 0 0.75rem;">▸ UNNEST template — copy and modify for your pipeline</p>
+
+      <div class="code-block">
+        <div class="cb-header">
+          <span>UNNEST Pattern — Flatten event_params into columns</span>
+          <span class="cb-lang">SQL · BigQuery</span>
+        </div>
+<pre>
+<span class="cc">-- Template: flatten GA4 nested params into a clean table</span>
+<span class="cc">-- Replace project/dataset/date with your actual values</span>
+<span class="ck">SELECT</span>
+    <span class="cc">-- Direct columns (no UNNEST needed)</span>
+    event_date,
+    event_name,
+    user_pseudo_id,
+    <span class="cf">TIMESTAMP_MICROS</span>(event_timestamp)     <span class="ck">AS</span> event_time,
+    geo.country,
+    geo.city,
+    device.category                         <span class="ck">AS</span> device_type,
+    traffic_source.source,
+    traffic_source.medium,
+
+    <span class="cc">-- UNNEST pattern for string params</span>
+    (<span class="ck">SELECT</span> value.string_value
+     <span class="ck">FROM</span> <span class="cf">UNNEST</span>(event_params)
+     <span class="ck">WHERE</span> key = <span class="cs">'page_location'</span>)          <span class="ck">AS</span> page_url,
+
+    (<span class="ck">SELECT</span> value.string_value
+     <span class="ck">FROM</span> <span class="cf">UNNEST</span>(event_params)
+     <span class="ck">WHERE</span> key = <span class="cs">'page_title'</span>)             <span class="ck">AS</span> page_title,
+
+    <span class="cc">-- UNNEST pattern for integer params</span>
+    (<span class="ck">SELECT</span> value.int_value
+     <span class="ck">FROM</span> <span class="cf">UNNEST</span>(event_params)
+     <span class="ck">WHERE</span> key = <span class="cs">'ga_session_id'</span>)          <span class="ck">AS</span> session_id,
+
+    (<span class="ck">SELECT</span> value.int_value
+     <span class="ck">FROM</span> <span class="cf">UNNEST</span>(event_params)
+     <span class="ck">WHERE</span> key = <span class="cs">'engagement_time_msec'</span>)    <span class="ck">AS</span> engagement_ms
+
+<span class="ck">FROM</span> <span class="cv">`your_project.analytics_XXXXXXXXX.events_*`</span>
+<span class="ck">WHERE</span>
+    <span class="cc">-- ALWAYS filter _TABLE_SUFFIX — avoids scanning all tables</span>
+    _TABLE_SUFFIX = <span class="cs">'20240115'</span>   <span class="cc">-- or use BETWEEN for date range</span>
+</pre>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══ SIDEBAR ═══ -->
+  <div class="side-col">
+
+    <!-- PRE-FLIGHT CHECKLIST -->
+    <div class="sidebar-card">
+      <div class="sidebar-card-title">▸ Pre-flight checklist</div>
+      <div class="checklist-mini">
+        <div class="cm-item">
+          <div class="cm-box done">✓</div>
+          <span>GA4 property exists (G-XXXXXXXXXX)</span>
+        </div>
+        <div class="cm-item">
+          <div class="cm-box done">✓</div>
+          <span>GCP project ready with BQ API enabled</span>
+        </div>
+        <div class="cm-item">
+          <div class="cm-box active"></div>
+          <span>GA4 Admin → BigQuery Links → Link clicked</span>
+        </div>
+        <div class="cm-item">
+          <div class="cm-box"></div>
+          <span>Dataset region matches existing BQ data</span>
+        </div>
+        <div class="cm-item">
+          <div class="cm-box"></div>
+          <span>Daily export selected (free)</span>
+        </div>
+        <div class="cm-item">
+          <div class="cm-box"></div>
+          <span>analytics_XXXXXXX dataset visible in BQ</span>
+        </div>
+        <div class="cm-item">
+          <div class="cm-box"></div>
+          <span>events_YYYYMMDD table exists after 24h</span>
+        </div>
+        <div class="cm-item">
+          <div class="cm-box"></div>
+          <span>Test query returns rows</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- YOUR PIPELINE -->
+    <div class="sidebar-card">
+      <div class="sidebar-card-title">▸ Your internship pipeline</div>
+      <div class="pipeline-mini">
+        <div class="pm-row">
+          <div class="pm-dot" style="background:var(--ga4);"></div>
+          <span class="pm-label">GA4 Events</span>
+          <span class="pm-sub">auto</span>
+        </div>
+        <div class="pm-row">
+          <div class="pm-dot" style="background:var(--bq);"></div>
+          <span class="pm-label">BigQuery Export</span>
+          <span class="pm-sub">native</span>
+        </div>
+        <div class="pm-row">
+          <div class="pm-dot" style="background:var(--ga4);"></div>
+          <span class="pm-label">Flatten via SQL</span>
+          <span class="pm-sub">UNNEST</span>
+        </div>
+        <div class="pm-row">
+          <div class="pm-dot" style="background:#e67e22;"></div>
+          <span class="pm-label">Extract → Parquet</span>
+          <span class="pm-sub">Python</span>
+        </div>
+        <div class="pm-row">
+          <div class="pm-dot" style="background:var(--red);"></div>
+          <span class="pm-label">Databricks</span>
+          <span class="pm-sub">PySpark</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- KEY TERMS -->
+    <div class="sidebar-card">
+      <div class="sidebar-card-title">▸ Key terms</div>
+      <div class="key-terms">
+        <div class="kt-item">
+          <div class="kt-term">event_params</div>
+          <div class="kt-def">Nested ARRAY&lt;STRUCT&gt; holding all parameters for an event. Requires UNNEST to query.</div>
+        </div>
+        <div class="kt-item">
+          <div class="kt-term">user_pseudo_id</div>
+          <div class="kt-def">Anonymous user ID based on cookie. Your main user identifier — not PII.</div>
+        </div>
+        <div class="kt-item">
+          <div class="kt-term">_TABLE_SUFFIX</div>
+          <div class="kt-def">Wildcard filter for sharded tables. Always filter this to avoid full scans and high costs.</div>
+        </div>
+        <div class="kt-item">
+          <div class="kt-term">Intraday table</div>
+          <div class="kt-def">Today's live streaming data. Gets replaced by the final daily table next morning.</div>
+        </div>
+        <div class="kt-item">
+          <div class="kt-term">ga_session_id</div>
+          <div class="kt-def">Session identifier inside event_params. Combine with user_pseudo_id for a unique session key.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COST WARNING -->
+    <div class="sidebar-card" style="border-color:var(--yellow); border-left:3px solid var(--yellow);">
+      <div class="sidebar-card-title" style="color:var(--yellow);">⚠ BQ cost reminder</div>
+      <div class="key-terms">
+        <div class="kt-def" style="font-size:0.62rem; line-height:1.7;">
+          BigQuery charges per TB scanned. GA4 tables get large fast. <strong>Always use _TABLE_SUFFIX filter</strong> in every query — this limits scan to specific date tables. Querying <code>events_*</code> without suffix filter = scans ALL history = surprise bill. At your internship, ask the billing limit before running large queries.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<footer style="border-top:1px solid var(--rule); padding:1.5rem 2rem; text-align:center; font-size:0.55rem; color:var(--muted); letter-spacing:0.2em; text-transform:uppercase;">
+  GA4 → BQ is native · Schema is nested · UNNEST is the key · Daily export is free · Always filter _TABLE_SUFFIX 🛣️
+</footer>
+
+</body>
+</html>
